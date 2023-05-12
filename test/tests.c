@@ -326,7 +326,12 @@ TEST(chash_maps, reset) {
   chmap_destroy(chmap);
 }
 
-void square_elem(const chmap_pair*, chmap_pair* val_pair, void*) {
+void square_elem(const chmap_pair* key_pair, chmap_pair* val_pair, void* args) {
+  // This if block is there to make the compiler happy, it's meaningless.
+  if (!key_pair) {
+    *(int*)args = 0;
+  }
+
   *(int*)val_pair->ptr *= *(int*)val_pair->ptr;
 }
 
@@ -363,7 +368,12 @@ TEST(chash_maps, exec_func_on_elem) {
   chmap_destroy(chmap);
 }
 
-void incr_elem(const chmap_pair*, chmap_pair* val_pair, void* args) {
+void incr_elem(const chmap_pair* key_pair, chmap_pair* val_pair, void* args) {
+  // This if block is there to make the compiler happy, it's meaningless.
+  if (!key_pair) {
+    *(int*)args = 0;
+  }
+
   *(int*)val_pair->ptr += (unsigned long)args;
 }
 
@@ -386,8 +396,13 @@ TEST(chash_maps, for_each_elem_wr) {
   chmap_destroy(chmap);
 }
 
-void add_elem_to_sum(const chmap_pair*, const chmap_pair* val_pair,
+void add_elem_to_sum(const chmap_pair* key_pair, const chmap_pair* val_pair,
                      void* args) {
+  // This if block is there to make the compiler happy, it's meaningless.
+  if (!key_pair) {
+    *(int*)args = 0;
+  }
+
   int* sum = (int*)args;
   *sum += *(int*)val_pair->ptr;
 }
