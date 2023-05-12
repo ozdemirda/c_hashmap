@@ -25,20 +25,20 @@ into it using the UGLY approach:
 int main() {
     // The value 256 is a hint for the initial hash bucket size
     // The bucket size is managed by the hashmap itself.
-	chashmap* chmap = chmap_create(256);
+    chashmap* chmap = chmap_create(256);
 
-	chmap_insert_elem(chmap,
-		&(chmap_pair){.ptr = "key1", .size = strlen("key1") + 1},
-		&(chmap_pair){.ptr = &(int){3}, .size = sizeof(int)});
+    chmap_insert_elem(chmap,
+        &(chmap_pair){.ptr = "key1", .size = strlen("key1") + 1},
+        &(chmap_pair){.ptr = &(int){3}, .size = sizeof(int)});
 
-	int val;
-	chmap_get_elem_copy(chmap,
-		&(chmap_pair){.ptr = "key1", .size = strlen("key1") + 1},
-		&val, sizeof(val));
+    int val;
+    chmap_get_elem_copy(chmap,
+        &(chmap_pair){.ptr = "key1", .size = strlen("key1") + 1},
+        &val, sizeof(val));
 
-	printf("val: %d\n", val);
+    printf("val: %d\n", val);
 
-	chmap_destroy(chmap);
+    chmap_destroy(chmap);
 }
 ```
 
@@ -60,31 +60,33 @@ int insert_int_kb_string(chashmap* chmap, const char *key, int val) {
 // Another wrapper function
 int get_int_kb_string(chashmap* chmap, const char *key, int *dest) {
     return chmap_get_elem_copy(chmap,
-		&(chmap_pair){.ptr = key, .size = strlen(key) + 1},
-		dest, sizeof(int));
+        &(chmap_pair){.ptr = key, .size = strlen(key) + 1},
+        dest, sizeof(int));
 }
 
 // The final wrapper function
 void delete_int_kb_string(chashmap* chmap, char *key) {
     chmap_delete_elem(chmap,
-		&(chmap_pair){.ptr = key, .size = strlen(key) + 1});
+        &(chmap_pair){.ptr = key, .size = strlen(key) + 1});
 }
 
 int main() {
     // The value 256 is a hint for the initial hash bucket size
     // The bucket size is managed by the hashmap itself.
-	chashmap* chmap = chmap_create(256);
+    chashmap* chmap = chmap_create(256);
 
-	insert_int_kb_string(chmap, "key1", 3);
+    insert_int_kb_string(chmap, "key1", 3);
 
-	int val;
+    int val;
     get_int_kb_string(chmap, "key1", &val);
 
-	delete_int_kb_string(chmap, "key1");
+    delete_int_kb_string(chmap, "key1");
 
-	printf("val: %d\n", val);
+    printf("val: %d\n", val);
 
-	chmap_destroy(chmap);
+    chmap_destroy(chmap);
+
+    return 0;
 }
 ```
 
