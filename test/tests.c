@@ -81,54 +81,151 @@ TEST(chash_maps, insert_values_with_different_sizes) {
   chashmap* chmap = chmap_create(1);
 
   const char* key1 = "key";
-
-  struct s1 {
-    unsigned int m1;
-    unsigned int m2;
-  } val1;
-  val1.m1 = 3;
-  val1.m2 = 5;
-
-  struct s2 {
-    unsigned long m1;
-    unsigned long m2;
-    unsigned long m3;
-    unsigned long m4;
-  } val2;
-  val2.m1 = 7;
-  val2.m2 = 9;
-  val2.m3 = 11;
-  val2.m4 = 13;
-
   chmap_pair* target_pair = NULL;
 
-  REQUIRE_EQ(
-      chmap_insert_elem(
-          chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
-          &(chmap_pair){.ptr = (void*)&val1, .size = sizeof(val1)}),
-      0);
+  {
+    struct s1 {
+      unsigned int m1;
+      unsigned int m2;
+    } val, test_val;
+    val.m1 = 3;
+    val.m2 = 5;
 
-  REQUIRE_EQ(
-      chmap_get_elem_ref(
-          chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
-          &target_pair),
-      0);
+    REQUIRE_EQ(
+        chmap_insert_elem(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &(chmap_pair){.ptr = (void*)&val, .size = sizeof(val)}),
+        0);
 
-  REQUIRE_EQ(memcmp(target_pair->ptr, &val1, sizeof(val1)), 0);
+    REQUIRE_EQ(
+        chmap_get_elem_ref(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &target_pair),
+        0);
 
-  REQUIRE_EQ(
-      chmap_insert_elem(
-          chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
-          &(chmap_pair){.ptr = (void*)&val2, .size = sizeof(val2)}),
-      0);
+    REQUIRE_EQ(memcmp(target_pair->ptr, &val, sizeof(val)), 0);
 
-  REQUIRE_EQ(
-      chmap_get_elem_ref(
-          chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
-          &target_pair),
-      0);
+    REQUIRE_EQ(
+        chmap_get_elem_copy(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &test_val, sizeof(test_val)),
+        0);
 
-  REQUIRE_EQ(memcmp(target_pair->ptr, &val2, sizeof(val2)), 0);
+    REQUIRE_EQ(memcmp(&test_val, &val, sizeof(val)), 0);
+  }
+
+  {
+    struct s2 {
+      unsigned long m1;
+      unsigned long m2;
+      unsigned long m3;
+      unsigned long m4;
+    } val, test_val;
+    val.m1 = 7;
+    val.m2 = 9;
+    val.m3 = 11;
+    val.m4 = 13;
+
+    REQUIRE_EQ(
+        chmap_insert_elem(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &(chmap_pair){.ptr = (void*)&val, .size = sizeof(val)}),
+        0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_ref(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &target_pair),
+        0);
+
+    REQUIRE_EQ(memcmp(target_pair->ptr, &val, sizeof(val)), 0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_copy(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &test_val, sizeof(test_val)),
+        0);
+
+    REQUIRE_EQ(memcmp(&test_val, &val, sizeof(val)), 0);
+  }
+
+  {
+    unsigned long val = 0xabcdef01, test_val = 0xffffffff;
+
+    REQUIRE_EQ(
+        chmap_insert_elem(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &(chmap_pair){.ptr = (void*)&val, .size = sizeof(val)}),
+        0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_ref(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &target_pair),
+        0);
+
+    REQUIRE_EQ(memcmp(target_pair->ptr, &val, sizeof(val)), 0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_copy(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &test_val, sizeof(test_val)),
+        0);
+
+    REQUIRE_EQ(memcmp(&test_val, &val, sizeof(val)), 0);
+  }
+
+  {
+    unsigned char val = 0xab, test_val = 0xcd;
+
+    REQUIRE_EQ(
+        chmap_insert_elem(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &(chmap_pair){.ptr = (void*)&val, .size = sizeof(val)}),
+        0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_ref(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &target_pair),
+        0);
+
+    REQUIRE_EQ(memcmp(target_pair->ptr, &val, sizeof(val)), 0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_copy(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &test_val, sizeof(test_val)),
+        0);
+
+    REQUIRE_EQ(memcmp(&test_val, &val, sizeof(val)), 0);
+  }
+
+  {
+    unsigned short val = 0xabcd, test_val = 0xef01;
+
+    REQUIRE_EQ(
+        chmap_insert_elem(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &(chmap_pair){.ptr = (void*)&val, .size = sizeof(val)}),
+        0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_ref(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &target_pair),
+        0);
+
+    REQUIRE_EQ(memcmp(target_pair->ptr, &val, sizeof(val)), 0);
+
+    REQUIRE_EQ(
+        chmap_get_elem_copy(
+            chmap, &(chmap_pair){.ptr = (void*)key1, .size = strlen(key1) + 1},
+            &test_val, sizeof(test_val)),
+        0);
+
+    REQUIRE_EQ(memcmp(&test_val, &val, sizeof(val)), 0);
+  }
 
   chmap_destroy(chmap);
 }

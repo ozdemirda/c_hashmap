@@ -160,6 +160,7 @@ bool reset_val_of_llist_node(llist_node* elem, const chmap_pair* val_pair) {
     } else {
       // Buffer reallocated, all is good.
       memcpy(elem->data.val_pair->ptr, val_pair->ptr, val_pair->size);
+      elem->data.val_pair->size = val_pair->size;
       success = true;
     }
   }
@@ -544,11 +545,11 @@ int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
 
   llist_node* r = find_in_llist(chmap->bucket_arr[index], key_pair);
   if (r) {
-    uint32_t size = target_buf_size;
-    if (r->data.val_pair->size < size) {
-      size = r->data.val_pair->size;
+    uint32_t min_size = target_buf_size;
+    if (r->data.val_pair->size < min_size) {
+      min_size = r->data.val_pair->size;
     }
-    mem_assign(target_buf, r->data.val_pair->ptr, size);
+    mem_assign(target_buf, r->data.val_pair->ptr, min_size);
     success = 0;
   }
 
