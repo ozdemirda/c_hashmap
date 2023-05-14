@@ -377,14 +377,10 @@ static inline uint32_t calculate_bucket_index(uint32_t bucket_arr_size,
     // Kind of a number assignment.
     assign_key_to_hash_id(&id, size, c_key_ptr);
   } else {
-    id = (2 * c_key_ptr[0] + 1);
-
-    for (uint32_t i = 1; i < size; ++i) {
-      if (i % 2 == 0) {
-        id += (2 * c_key_ptr[i] + 1);
-      } else {
-        id ^= (2 * c_key_ptr[i] + 1);
-      }
+    // DJB2
+    id = 5381;
+    for (uint32_t i = 0; i < size; ++i) {
+      id = ((id << 5) + id) + c_key_ptr[i];
     }
   }
 
