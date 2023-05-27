@@ -110,23 +110,24 @@ supported operations:
 - uint32_t chmap_elem_count(chashmap* chmap);
 - int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size);
 - int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
-                      const chmap_pair* val_pair);
+                        const chmap_pair* val_pair);
 - int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
-                        void* target_buf, uint32_t target_buf_size);
+                          void* target_buf, uint32_t target_buf_size);
 - int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
-                       chmap_pair** val_pair);
+                         chmap_pair** val_pair);
 - void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair);
 - int chmap_exec_func_on_elem(chashmap* chmap, const chmap_pair* key_pair,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             chmap_pair* val_pair, void* args),
-                            void* args);
+                              void (*callback)(const chmap_pair* key_pair,
+                                               chmap_pair* val_pair,
+                                               void* args),
+                              void* args);
 - void chmap_for_each_elem_wr(chashmap* chmap,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             chmap_pair* val_pair, void* args),
-                            void* args);
+                              void (*callback)(const chmap_pair* key_pair,
+                                               chmap_pair* val_pair, void* args),
+                              void* args);
 - void chmap_for_each_elem_rd(chashmap* chmap,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             const chmap_pair* val_pair,
-                                             void* args),
-                            void* args);
+                              void (*callback)(const chmap_pair* key_pair,
+                                               const chmap_pair* val_pair,
+                                               void* args),
+                              void* args);
 ```
