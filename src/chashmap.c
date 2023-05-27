@@ -35,6 +35,20 @@ const uint32_t scale_factor = 4;
 const uint32_t minimum_scale_down_threshold =
     scale_factor * minimum_allowed_bucket_array_size;
 
+static inline void mem_assign(void* dest, void* src, uint32_t size) {
+  if (size == sizeof(unsigned int)) {
+    *(unsigned int*)dest = *(unsigned int*)src;
+  } else if (size == sizeof(unsigned long)) {
+    *(unsigned long*)dest = *(unsigned long*)src;
+  } else if (size == sizeof(unsigned char)) {
+    *(unsigned char*)dest = *(unsigned char*)src;
+  } else if (size == sizeof(unsigned short)) {
+    *(unsigned short*)dest = *(unsigned short*)src;
+  } else {
+    memcpy(dest, src, size);
+  }
+}
+
 typedef struct chmap_entry {
   unsigned long hash_val;
   chmap_pair* key_pair;
@@ -134,10 +148,10 @@ llist_node* create_llist_node(dllist_ref_node** head_of_all_elems,
   new_elem->data.hash_val = data->hash_val;
   new_elem->data.key_pair->size = data->key_pair->size;
   new_elem->data.val_pair->size = data->val_pair->size;
-  memcpy(new_elem->data.key_pair->ptr, data->key_pair->ptr,
-         data->key_pair->size);
-  memcpy(new_elem->data.val_pair->ptr, data->val_pair->ptr,
-         data->val_pair->size);
+  mem_assign(new_elem->data.key_pair->ptr, data->key_pair->ptr,
+             data->key_pair->size);
+  mem_assign(new_elem->data.val_pair->ptr, data->val_pair->ptr,
+             data->val_pair->size);
 
   return new_elem;
 }
@@ -147,7 +161,7 @@ bool reset_val_of_llist_node(llist_node* elem, const chmap_pair* val_pair) {
 
   if (elem->data.val_pair->size == val_pair->size) {
     // The new value has the same size
-    memcpy(elem->data.val_pair->ptr, val_pair->ptr, val_pair->size);
+    mem_assign(elem->data.val_pair->ptr, val_pair->ptr, val_pair->size);
     success = true;
   } else {
     // Sizes do not match, trying to realloc.
@@ -159,7 +173,7 @@ bool reset_val_of_llist_node(llist_node* elem, const chmap_pair* val_pair) {
       elem->data.val_pair->ptr = orig_buf;
     } else {
       // Buffer reallocated, all is good.
-      memcpy(elem->data.val_pair->ptr, val_pair->ptr, val_pair->size);
+      mem_assign(elem->data.val_pair->ptr, val_pair->ptr, val_pair->size);
       elem->data.val_pair->size = val_pair->size;
       success = true;
     }
@@ -509,20 +523,6 @@ int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
   pthread_rwlock_unlock(&chmap->lock);
 
   return success ? 0 : -1;
-}
-
-static inline void mem_assign(void* dest, void* src, uint32_t size) {
-  if (size == sizeof(unsigned int)) {
-    *(unsigned int*)dest = *(unsigned int*)src;
-  } else if (size == sizeof(unsigned long)) {
-    *(unsigned long*)dest = *(unsigned long*)src;
-  } else if (size == sizeof(unsigned char)) {
-    *(unsigned char*)dest = *(unsigned char*)src;
-  } else if (size == sizeof(unsigned short)) {
-    *(unsigned short*)dest = *(unsigned short*)src;
-  } else {
-    memcpy(dest, src, size);
-  }
 }
 
 int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
