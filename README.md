@@ -28,12 +28,12 @@ int main() {
     chashmap* chmap = chmap_create(256);
 
     chmap_insert_elem(chmap,
-        &(chmap_pair){.ptr = "key1", .size = strlen("key1") + 1},
+        &(chmap_pair){.ptr = "key1", .size = strlen("key1")},
         &(chmap_pair){.ptr = &(int){3}, .size = sizeof(int)});
 
     int val;
     chmap_get_elem_copy(chmap,
-        &(chmap_pair){.ptr = "key1", .size = strlen("key1") + 1},
+        &(chmap_pair){.ptr = "key1", .size = strlen("key1")},
         &val, sizeof(val));
 
     printf("val: %d\n", val);
@@ -53,21 +53,21 @@ Now a hopefully more maintainable way of doing something similar:
 // A wrapper function: insert integer keyed by string
 int insert_int_kb_string(chashmap* chmap, const char *key, int val) {
     return chmap_insert_elem(chmap,
-        &(chmap_pair){.ptr = key, .size = strlen(key) + 1},
+        &(chmap_pair){.ptr = key, .size = strlen(key)},
         &(chmap_pair){.ptr = &val, .size = sizeof(int)});
 }
 
 // Another wrapper function
 int get_int_kb_string(chashmap* chmap, const char *key, int *dest) {
     return chmap_get_elem_copy(chmap,
-        &(chmap_pair){.ptr = key, .size = strlen(key) + 1},
+        &(chmap_pair){.ptr = key, .size = strlen(key)},
         dest, sizeof(int));
 }
 
 // The final wrapper function
 void delete_int_kb_string(chashmap* chmap, char *key) {
     chmap_delete_elem(chmap,
-        &(chmap_pair){.ptr = key, .size = strlen(key) + 1});
+        &(chmap_pair){.ptr = key, .size = strlen(key)});
 }
 
 int main() {
@@ -116,18 +116,8 @@ supported operations:
 - int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
                          chmap_pair** val_pair);
 - void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair);
-- int chmap_exec_func_on_elem(chashmap* chmap, const chmap_pair* key_pair,
-                              void (*callback)(const chmap_pair* key_pair,
-                                               chmap_pair* val_pair,
-                                               void* args),
-                              void* args);
-- void chmap_for_each_elem_wr(chashmap* chmap,
-                              void (*callback)(const chmap_pair* key_pair,
-                                               chmap_pair* val_pair, void* args),
-                              void* args);
-- void chmap_for_each_elem_rd(chashmap* chmap,
-                              void (*callback)(const chmap_pair* key_pair,
-                                               const chmap_pair* val_pair,
-                                               void* args),
-                              void* args);
+- void chmap_for_each_elem(chashmap* chmap,
+                           void (*callback)(const chmap_pair* key_pair,
+                                            chmap_pair* val_pair, void* args),
+                           void* args);
 ```
