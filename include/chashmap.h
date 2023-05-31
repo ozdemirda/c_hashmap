@@ -67,23 +67,14 @@ int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size);
 int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
                       const chmap_pair* val_pair);
 
-// The function chmap_get_elem_copy populates a copy of the original val_pair
-// from the hash map into the val_pair. val_pair SHOULD BE non-null, otherwise
-// the function will fail. This function is slower than the function
-// 'chmap_get_elem_ref', and later modifications to val_pair are not reflected
-// in the map's copy, but it's safer.
+// The function chmap_get_elem_copy populates a copy of the data stored in the
+// val_pair from the hash map into the target_buf. The pointer target_buf SHOULD
+// BE non-null, otherwise the function will fail.
 int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
                         void* target_buf, uint32_t target_buf_size);
 
 // This function gets a pointer to the element's value pair and stores it into
 // the pointer-to-pointer val_pair. Here, naturally, val_pair gets overwritten.
-// USE THIS FUNCTION WITH CAUTION, AS THE POINTER'S VALIDITY IS ONLY GUARANTEED
-// WHILE THIS FUNCTION IS RUNNING AND THE POINTER MAY GET DEALLOCATED ANY TIME
-// AFTER THIS FUNCTION'S COMPLETION. IT MAY COME HANDY FOR THE SCENARIOS
-// THAT THE CALLER KNOWS FOR SURE THAT THE ELEMENT IS NOT GOING TO BE FREED
-// ANY TIME SOON.
-// USING THE FUNCTION chmap_exec_func_on_elem INSTEAD OF THIS ONE
-// IS STRONGLY RECOMMENDED. CONSIDER YOURSELF WARNED.
 int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
                        chmap_pair** val_pair);
 
@@ -91,39 +82,14 @@ int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
 // hash map.
 void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair);
 
-// The function 'chmap_exec_func_on_elem' can be used to perform incremental
-// modifications on the val_pair for a given key_pair. It's safer, because
-// during its execution, the synchronization locks are held. PLEASE NOTICE
-// THAT THE CALLBACK FUNCTION SHOULD BE FAST, AND IT SHOULD NOT MAKE
-// ANY BLOCKING CALLS, AS THIS MAY DEGRADE THE PERFORMANCE, IT MAY EVEN
-// CAUSE DEADLOCKS DEPENDING WHAT'S DONE IN IT. FINALLY, PLEASE NOTICE THE
-// 'const' FOR THE key_pair IN THE CALLBACK'S SIGNATURE, IF YOU NEGLECT IT
-// USING SOME CASTING AND MODIFY THE KEY, YOU'LL SHOOT YOURSELF ON THE FOOT.
-int chmap_exec_func_on_elem(chashmap* chmap, const chmap_pair* key_pair,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             chmap_pair* val_pair, void* args),
-                            void* args);
-
-// The function 'chmap_for_each_elem_wr' is meant to provide a mechanism similar
-// to iteration. It will write-lock the hash map and execute the callback on the
-// every element present in the map. PLEASE DO NOT NEGLECT THE 'const' FOR
-// THE 'key_pair' IN THE CALLBACK, AND TAMPER WITH IT. THAT WILL CAUSE
-// PROBLEMS.
-void chmap_for_each_elem_wr(chashmap* chmap,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             chmap_pair* val_pair, void* args),
-                            void* args);
-
-// The function 'chmap_for_each_elem_rd' is meant to provide a mechanism similar
-// to iteration. It will read-lock the hash map and execute the callback on the
-// every element present in the map. PLEASE DO NOT NEGLECT THE 'const'
-// specifiers FOR THE 'key_pair' AND 'val_pair' IN THE CALLBACK, AND TAMPER
-// WITH THEM. THAT WILL NATURALLY CAUSE PROBLEMS.
-void chmap_for_each_elem_rd(chashmap* chmap,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             const chmap_pair* val_pair,
-                                             void* args),
-                            void* args);
+// The function 'chmap_for_each_elem' is meant to provide a mechanism similar
+// to iteration. It will execute the callback on the every element present in
+// the map. PLEASE DO NOT NEGLECT THE 'const' FOR THE 'key_pair' IN THE
+// CALLBACK, AND TAMPER WITH IT. THAT WILL CAUSE PROBLEMS.
+void chmap_for_each_elem(chashmap* chmap,
+                         void (*callback)(const chmap_pair* key_pair,
+                                          chmap_pair* val_pair, void* args),
+                         void* args);
 
 // The function '_chmap_destroy' is not meant to be used directly, please use
 // the macro 'chmap_destroy' instead.

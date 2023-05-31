@@ -23,12 +23,16 @@ SOFTWARE.
 */
 
 #include <chashmap.h>
-#include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
+
+#define mem_alloc(size) malloc(size)
+#define mem_calloc(elem_count, elem_size) calloc(elem_count, elem_size)
+#define mem_realloc(ptr, new_size) realloc(ptr, new_size)
+#define mem_free(ptr) free(ptr)
 
 const uint32_t minimum_allowed_bucket_array_size = 2048;
 const uint32_t scale_factor = 4;
@@ -101,43 +105,43 @@ struct llist_node {
 
 void destroy_llist_node(dllist_ref_node** head_of_all_elems, llist_node* elem) {
   if (elem) {
-    if (elem->data.key_pair->ptr) free(elem->data.key_pair->ptr);
-    if (elem->data.key_pair) free(elem->data.key_pair);
-    if (elem->data.val_pair->ptr) free(elem->data.val_pair->ptr);
-    if (elem->data.val_pair) free(elem->data.val_pair);
+    if (elem->data.key_pair->ptr) mem_free(elem->data.key_pair->ptr);
+    if (elem->data.key_pair) mem_free(elem->data.key_pair);
+    if (elem->data.val_pair->ptr) mem_free(elem->data.val_pair->ptr);
+    if (elem->data.val_pair) mem_free(elem->data.val_pair);
     if (head_of_all_elems) {
       detach_node_from_dllist(head_of_all_elems, &elem->dllist_refs);
     }
-    free(elem);
+    mem_free(elem);
   }
 }
 
 llist_node* create_llist_node(dllist_ref_node** head_of_all_elems,
                               chmap_entry* data) {
-  llist_node* new_elem = (llist_node*)calloc(1, sizeof(llist_node));
+  llist_node* new_elem = (llist_node*)mem_calloc(1, sizeof(llist_node));
   if (!new_elem) {
     return NULL;
   }
 
-  new_elem->data.key_pair = (chmap_pair*)malloc(sizeof(chmap_pair));
+  new_elem->data.key_pair = (chmap_pair*)mem_alloc(sizeof(chmap_pair));
   if (!new_elem->data.key_pair) {
     destroy_llist_node(head_of_all_elems, new_elem);
     return NULL;
   }
 
-  new_elem->data.val_pair = (chmap_pair*)malloc(sizeof(chmap_pair));
+  new_elem->data.val_pair = (chmap_pair*)mem_alloc(sizeof(chmap_pair));
   if (!new_elem->data.val_pair) {
     destroy_llist_node(head_of_all_elems, new_elem);
     return NULL;
   }
 
-  new_elem->data.key_pair->ptr = malloc(data->key_pair->size);
+  new_elem->data.key_pair->ptr = mem_alloc(data->key_pair->size);
   if (!new_elem->data.key_pair->ptr) {
     destroy_llist_node(head_of_all_elems, new_elem);
     return NULL;
   }
 
-  new_elem->data.val_pair->ptr = malloc(data->val_pair->size);
+  new_elem->data.val_pair->ptr = mem_alloc(data->val_pair->size);
   if (!new_elem->data.val_pair->ptr) {
     destroy_llist_node(head_of_all_elems, new_elem);
     return NULL;
@@ -164,10 +168,10 @@ bool reset_val_of_llist_node(llist_node* elem, const chmap_pair* val_pair) {
     mem_assign(elem->data.val_pair->ptr, val_pair->ptr, val_pair->size);
     success = true;
   } else {
-    // Sizes do not match, trying to realloc.
+    // Sizes do not match, trying to reallocate.
     void* orig_buf = elem->data.val_pair->ptr;
     elem->data.val_pair->ptr =
-        realloc(elem->data.val_pair->ptr, val_pair->size);
+        mem_realloc(elem->data.val_pair->ptr, val_pair->size);
     if (!elem->data.val_pair->ptr) {
       // Failed to reallocate.
       elem->data.val_pair->ptr = orig_buf;
@@ -293,7 +297,6 @@ llist_node* delete_from_llist(llist_node* head,
 }
 
 struct chashmap {
-  pthread_rwlock_t lock;
   uint32_t elem_count;
   uint32_t bucket_arr_size;
   uint32_t elem_count_to_scale_up;
@@ -319,19 +322,11 @@ chashmap* chmap_create(uint32_t initial_bucket_array_size) {
         powl(2, ceill(log2l(initial_bucket_array_size)));
   }
 
-  chashmap* chmap = (chashmap*)malloc(sizeof(chashmap));
+  chashmap* chmap = (chashmap*)mem_alloc(sizeof(chashmap));
   if (!chmap) {
     // Failed to allocate buffer
     fprintf(stderr, "%s - %s:%d - Failed to allocate buffer\n",
             __PRETTY_FUNCTION__, __FILE__, __LINE__);
-    return NULL;
-  }
-
-  if (pthread_rwlock_init(&chmap->lock, NULL)) {
-    // Failed to initialize map mutex
-    fprintf(stderr, "%s - %s:%d - Failed to initialize map mutex\n",
-            __PRETTY_FUNCTION__, __FILE__, __LINE__);
-    free(chmap);
     return NULL;
   }
 
@@ -340,14 +335,13 @@ chashmap* chmap_create(uint32_t initial_bucket_array_size) {
   chmap->head_of_all_elems = NULL;
   set_chmap_scaling_limits(chmap);
   chmap->bucket_arr =
-      (llist_node**)calloc(initial_bucket_array_size, sizeof(llist_node*));
+      (llist_node**)mem_calloc(initial_bucket_array_size, sizeof(llist_node*));
 
   if (!chmap->bucket_arr) {
     // Failed to allocate buffer for bucket_arr
     fprintf(stderr, "%s - %s:%d - Failed to allocate bucket_arr\n",
             __PRETTY_FUNCTION__, __FILE__, __LINE__);
-    pthread_rwlock_destroy(&chmap->lock);
-    free(chmap);
+    mem_free(chmap);
     return NULL;
   }
 
@@ -413,13 +407,7 @@ uint32_t chmap_get_bucket_arr_size(chashmap* chmap) {
     return 0;
   }
 
-  uint32_t r;
-
-  pthread_rwlock_rdlock(&chmap->lock);
-  r = chmap->bucket_arr_size;
-  pthread_rwlock_unlock(&chmap->lock);
-
-  return r;
+  return chmap->bucket_arr_size;
 }
 
 uint32_t chmap_get_elem_count_to_scale_up(chashmap* chmap) {
@@ -427,13 +415,7 @@ uint32_t chmap_get_elem_count_to_scale_up(chashmap* chmap) {
     return 0;
   }
 
-  uint32_t r;
-
-  pthread_rwlock_rdlock(&chmap->lock);
-  r = chmap->elem_count_to_scale_up;
-  pthread_rwlock_unlock(&chmap->lock);
-
-  return r;
+  return chmap->elem_count_to_scale_up;
 }
 
 uint32_t chmap_get_elem_count_to_scale_down(chashmap* chmap) {
@@ -441,13 +423,7 @@ uint32_t chmap_get_elem_count_to_scale_down(chashmap* chmap) {
     return 0;
   }
 
-  uint32_t r;
-
-  pthread_rwlock_rdlock(&chmap->lock);
-  r = chmap->elem_count_to_scale_down;
-  pthread_rwlock_unlock(&chmap->lock);
-
-  return r;
+  return chmap->elem_count_to_scale_down;
 }
 #endif
 
@@ -462,7 +438,7 @@ void scale_chmap(chashmap* chmap, bool up) {
   }
 
   llist_node** new_bucket_arr =
-      (llist_node**)calloc(new_bucket_array_size, sizeof(llist_node*));
+      (llist_node**)mem_calloc(new_bucket_array_size, sizeof(llist_node*));
   if (!new_bucket_arr) {
     // We don't have enough memory to scale, return.
     return;
@@ -481,7 +457,7 @@ void scale_chmap(chashmap* chmap, bool up) {
     chmap->bucket_arr[i] = NULL;
   }
 
-  free(chmap->bucket_arr);
+  mem_free(chmap->bucket_arr);
   chmap->bucket_arr = new_bucket_arr;
   chmap->bucket_arr_size = new_bucket_array_size;
   set_chmap_scaling_limits(chmap);
@@ -499,8 +475,6 @@ int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
                       .val_pair = (chmap_pair*)val_pair};
 
   bool success = false;
-
-  pthread_rwlock_wrlock(&chmap->lock);
 
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, &data.hash_val);
@@ -520,8 +494,6 @@ int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
     }
   }
 
-  pthread_rwlock_unlock(&chmap->lock);
-
   return success ? 0 : -1;
 }
 
@@ -533,8 +505,6 @@ int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
   }
 
   int success = -1;
-
-  pthread_rwlock_rdlock(&chmap->lock);
 
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, NULL);
@@ -549,8 +519,6 @@ int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
     success = 0;
   }
 
-  pthread_rwlock_unlock(&chmap->lock);
-
   return success;
 }
 
@@ -563,8 +531,6 @@ int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
 
   int success = -1;
 
-  pthread_rwlock_rdlock(&chmap->lock);
-
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, NULL);
 
@@ -573,35 +539,6 @@ int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
     *val_pair = r->data.val_pair;
     success = 0;
   }
-
-  pthread_rwlock_unlock(&chmap->lock);
-
-  return success;
-}
-
-int chmap_exec_func_on_elem(chashmap* chmap, const chmap_pair* key_pair,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             chmap_pair* val_pair, void* args),
-                            void* args) {
-  if (!chmap || !key_pair || !key_pair->ptr || key_pair->size == 0 ||
-      !callback) {
-    return -1;
-  }
-
-  int success = -1;
-
-  pthread_rwlock_wrlock(&chmap->lock);
-
-  uint32_t index =
-      calculate_bucket_index(chmap->bucket_arr_size, key_pair, NULL);
-
-  llist_node* r = find_in_llist(chmap->bucket_arr[index], key_pair);
-  if (r) {
-    (*callback)(r->data.key_pair, r->data.val_pair, args);
-    success = 0;
-  }
-
-  pthread_rwlock_unlock(&chmap->lock);
 
   return success;
 }
@@ -612,8 +549,6 @@ void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair) {
   }
 
   bool found = false;
-
-  pthread_rwlock_wrlock(&chmap->lock);
 
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, NULL);
@@ -628,31 +563,23 @@ void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair) {
       scale_chmap(chmap, false);
     }
   }
-
-  pthread_rwlock_unlock(&chmap->lock);
 }
 
 uint32_t chmap_elem_count(chashmap* chmap) {
-  uint32_t r = 0;
-
   if (chmap) {
-    pthread_rwlock_rdlock(&chmap->lock);
-    r = chmap->elem_count;
-    pthread_rwlock_unlock(&chmap->lock);
+    return chmap->elem_count;
   }
 
-  return r;
+  return 0;
 }
 
-void chmap_for_each_elem_wr(chashmap* chmap,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             chmap_pair* val_pair, void* args),
-                            void* args) {
+void chmap_for_each_elem(chashmap* chmap,
+                         void (*callback)(const chmap_pair* key_pair,
+                                          chmap_pair* val_pair, void* args),
+                         void* args) {
   if (!chmap || !callback) {
     return;
   }
-
-  pthread_rwlock_wrlock(&chmap->lock);
 
   dllist_ref_node* tracker = chmap->head_of_all_elems;
   while (tracker) {
@@ -660,29 +587,6 @@ void chmap_for_each_elem_wr(chashmap* chmap,
                 args);
     tracker = tracker->next;
   }
-
-  pthread_rwlock_unlock(&chmap->lock);
-}
-
-void chmap_for_each_elem_rd(chashmap* chmap,
-                            void (*callback)(const chmap_pair* key_pair,
-                                             const chmap_pair* val_pair,
-                                             void* args),
-                            void* args) {
-  if (!chmap || !callback) {
-    return;
-  }
-
-  pthread_rwlock_wrlock(&chmap->lock);
-
-  dllist_ref_node* tracker = chmap->head_of_all_elems;
-  while (tracker) {
-    (*callback)(tracker->host->data.key_pair, tracker->host->data.val_pair,
-                args);
-    tracker = tracker->next;
-  }
-
-  pthread_rwlock_unlock(&chmap->lock);
 }
 
 int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
@@ -699,8 +603,6 @@ int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
     new_bucket_array_size = powl(2, ceill(log2l(new_bucket_array_size)));
   }
 
-  pthread_rwlock_wrlock(&chmap->lock);
-
   for (uint32_t i = 0; i < chmap->bucket_arr_size; ++i) {
     destroy_the_whole_llist(chmap->bucket_arr[i], &chmap->head_of_all_elems);
   }
@@ -708,8 +610,8 @@ int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
   if (new_bucket_array_size > 0 &&
       new_bucket_array_size != chmap->bucket_arr_size) {
     llist_node** orig = chmap->bucket_arr;
-    chmap->bucket_arr =
-        realloc(chmap->bucket_arr, new_bucket_array_size * sizeof(llist_node*));
+    chmap->bucket_arr = mem_realloc(
+        chmap->bucket_arr, new_bucket_array_size * sizeof(llist_node*));
     if (!chmap->bucket_arr) {
       chmap->bucket_arr = orig;
       success = -1;
@@ -721,18 +623,15 @@ int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
   memset(chmap->bucket_arr, 0, chmap->bucket_arr_size * sizeof(llist_node*));
   chmap->elem_count = 0;
 
-  pthread_rwlock_unlock(&chmap->lock);
-
   return success;
 }
 
 void _chmap_destroy(chashmap* chmap) {
   if (chmap) {
-    pthread_rwlock_destroy(&chmap->lock);
     for (uint32_t i = 0; i < chmap->bucket_arr_size; ++i) {
       destroy_the_whole_llist(chmap->bucket_arr[i], &chmap->head_of_all_elems);
     }
-    free((void*)chmap->bucket_arr);
-    free(chmap);
+    mem_free((void*)chmap->bucket_arr);
+    mem_free(chmap);
   }
 }

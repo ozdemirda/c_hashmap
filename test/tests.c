@@ -423,48 +423,6 @@ TEST(chash_maps, reset) {
   chmap_destroy(chmap);
 }
 
-void square_elem(const chmap_pair* key_pair, chmap_pair* val_pair, void* args) {
-  // This if block is there to make the compiler happy, it's meaningless.
-  if (!key_pair) {
-    *(int*)args = 0;
-  }
-
-  *(int*)val_pair->ptr *= *(int*)val_pair->ptr;
-}
-
-int exec_func_on_int_from_string(chashmap* chmap, const char* key,
-                                 void (*callback)(const chmap_pair* key_pair,
-                                                  chmap_pair* val_pair,
-                                                  void* args),
-                                 void* args) {
-  return chmap_exec_func_on_elem(
-      chmap, &(chmap_pair){.ptr = (void*)key, .size = strlen(key) + 1},
-      callback, args);
-}
-
-TEST(chash_maps, exec_func_on_elem) {
-  chashmap* chmap = chmap_create(1);
-  REQUIRE_NE((void*)chmap, NULL);
-
-  REQUIRE_EQ(insert_string_to_int(chmap, "key1", 3), 0);
-  REQUIRE_EQ(insert_string_to_int(chmap, "key2", 5), 0);
-
-  REQUIRE_EQ(exec_func_on_int_from_string(chmap, "key1", square_elem, NULL), 0);
-  REQUIRE_EQ(exec_func_on_int_from_string(chmap, "key2", square_elem, NULL), 0);
-
-  // Non-existent keys should not cause any problems
-  REQUIRE_EQ(exec_func_on_int_from_string(chmap, "key", square_elem, NULL), -1);
-  REQUIRE_EQ(exec_func_on_int_from_string(chmap, "", square_elem, NULL), -1);
-
-  int val = -1;
-  REQUIRE_EQ(get_int_from_string(chmap, "key1", &val), 0);
-  REQUIRE_EQ(val, 9);
-  REQUIRE_EQ(get_int_from_string(chmap, "key2", &val), 0);
-  REQUIRE_EQ(val, 25);
-
-  chmap_destroy(chmap);
-}
-
 void incr_elem(const chmap_pair* key_pair, chmap_pair* val_pair, void* args) {
   // This if block is there to make the compiler happy, it's meaningless.
   if (!key_pair) {
@@ -482,7 +440,7 @@ TEST(chash_maps, for_each_elem_wr) {
   REQUIRE_EQ(insert_string_to_int(chmap, "key2", 5), 0);
 
   // Add 7 to each one of the elements in the hash map
-  chmap_for_each_elem_wr(chmap, incr_elem, (void*)7);
+  chmap_for_each_elem(chmap, incr_elem, (void*)7);
 
   int val = -1;
   REQUIRE_EQ(get_int_from_string(chmap, "key1", &val), 0);
@@ -493,7 +451,7 @@ TEST(chash_maps, for_each_elem_wr) {
   chmap_destroy(chmap);
 }
 
-void add_elem_to_sum(const chmap_pair* key_pair, const chmap_pair* val_pair,
+void add_elem_to_sum(const chmap_pair* key_pair, chmap_pair* val_pair,
                      void* args) {
   // This if block is there to make the compiler happy, it's meaningless.
   if (!key_pair) {
@@ -515,7 +473,7 @@ TEST(chash_maps, for_each_elem_rd) {
 
   // Add 3 and 5 on top of sum. It should be 8
   // when the following statement is completed.
-  chmap_for_each_elem_rd(chmap, add_elem_to_sum, (void*)&sum);
+  chmap_for_each_elem(chmap, add_elem_to_sum, (void*)&sum);
 
   REQUIRE_EQ(sum, 8);
 
