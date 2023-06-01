@@ -25,7 +25,7 @@ into it using the UGLY approach:
 int main() {
     // The value 256 is a hint for the initial hash bucket size
     // The bucket size is managed by the hashmap itself.
-    chashmap* chmap = chmap_create(256);
+    chashmap* chmap = chmap_create(256, NULL);
 
     chmap_insert_elem(chmap,
         &(chmap_pair){.ptr = "key1", .size = strlen("key1")},
@@ -71,9 +71,12 @@ void delete_int_kb_string(chashmap* chmap, char *key) {
 }
 
 int main() {
+    char* err_str;
     // The value 256 is a hint for the initial hash bucket size
     // The bucket size is managed by the hashmap itself.
-    chashmap* chmap = chmap_create(256);
+    // Here the err_str will contain a static 'string' telling
+    // about the problem, if something goes wrong.
+    chashmap* chmap = chmap_create(256, &err_str);
 
     insert_int_kb_string(chmap, "key1", 3);
 
@@ -105,7 +108,7 @@ Here's a list of available functions/macros to give you and idea about the
 supported operations:
 
 ```c
-- chashmap* chmap_create(uint32_t initial_bucket_array_size);
+- chashmap* chmap_create(uint32_t initial_bucket_array_size, char** err);
 - chmap_destroy(chmap) // `A macro`
 - uint32_t chmap_elem_count(chashmap* chmap);
 - int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size);
