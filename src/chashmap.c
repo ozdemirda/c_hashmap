@@ -26,13 +26,15 @@ SOFTWARE.
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <math.h>
 
 #define mem_alloc(size) malloc(size)
 #define mem_calloc(elem_count, elem_size) calloc(elem_count, elem_size)
 #define mem_realloc(ptr, new_size) realloc(ptr, new_size)
 #define mem_free(ptr) free(ptr)
+
+#define stringify(s) #s
+#define x_stringify(s) stringify(s)
+#define CERR_STR(x) (__FILE__ ":" x_stringify(__LINE__) " - " x)
 
 const uint32_t minimum_allowed_bucket_array_size = 2048;
 const uint32_t scale_factor = 4;
@@ -310,23 +312,75 @@ void set_chmap_scaling_limits(chashmap* chmap) {
   chmap->elem_count_to_scale_down = chmap->bucket_arr_size / 8;
 }
 
-chashmap* chmap_create(uint32_t initial_bucket_array_size) {
+#define POWERS_OF_TWO_LEN 31
+uint32_t uint32_powers_of_two[POWERS_OF_TWO_LEN] = {
+    2,         4,          8,         16,       32,       64,        128,
+    256,       512,        1024,      2048,     4096,     8192,      16384,
+    32768,     65536,      131072,    262144,   524288,   1048576,   2097152,
+    4194304,   8388608,    16777216,  33554432, 67108864, 134217728, 268435456,
+    536870912, 1073741824, 2147483648};  // 4294967296 exceeds 32 bits
+
+// Kind of a "pow(2, ceil(log2(input)))" without the math library.
+uint32_t find_nearest_gte_power_of_two(uint32_t input) {
+  int left = 0;
+  int right = POWERS_OF_TWO_LEN - 1;
+  int middle = (left + right) / 2;
+
+  if (input <= uint32_powers_of_two[0]) {
+    return uint32_powers_of_two[0];
+  }
+
+  if (input >= uint32_powers_of_two[POWERS_OF_TWO_LEN - 1]) {
+    return uint32_powers_of_two[POWERS_OF_TWO_LEN - 1];
+  }
+
+  uint32_t result = 0;
+
+  while (left < right) {
+    if (uint32_powers_of_two[middle] == input ||
+        (middle > 0 && uint32_powers_of_two[middle - 1] < input &&
+         input < uint32_powers_of_two[middle])) {
+      result = uint32_powers_of_two[middle];
+      break;
+    } else if (middle < (POWERS_OF_TWO_LEN - 1) &&
+               uint32_powers_of_two[middle] < input &&
+               input <= uint32_powers_of_two[middle + 1]) {
+      result = uint32_powers_of_two[middle + 1];
+      break;
+    }
+
+    if (input < uint32_powers_of_two[middle]) {
+      right = middle;
+    } else {
+      left = middle;
+    }
+
+    middle = (left + right) / 2;
+  }
+
+  return result;
+}
+
+chashmap* chmap_create(uint32_t initial_bucket_array_size, char** err) {
   if (initial_bucket_array_size == 0) {
+    if (err) {
+      *err = CERR_STR("The initial bucket size is zero");
+    }
     return NULL;
   }
 
-  if (initial_bucket_array_size < minimum_allowed_bucket_array_size) {
+  if (initial_bucket_array_size <= minimum_allowed_bucket_array_size) {
     initial_bucket_array_size = minimum_allowed_bucket_array_size;
   } else {
     initial_bucket_array_size =
-        powl(2, ceill(log2l(initial_bucket_array_size)));
+        find_nearest_gte_power_of_two(initial_bucket_array_size);
   }
 
   chashmap* chmap = (chashmap*)mem_alloc(sizeof(chashmap));
   if (!chmap) {
-    // Failed to allocate buffer
-    fprintf(stderr, "%s - %s:%d - Failed to allocate buffer\n",
-            __PRETTY_FUNCTION__, __FILE__, __LINE__);
+    if (err) {
+      *err = CERR_STR("Failed to allocate buffer");
+    }
     return NULL;
   }
 
@@ -339,10 +393,15 @@ chashmap* chmap_create(uint32_t initial_bucket_array_size) {
 
   if (!chmap->bucket_arr) {
     // Failed to allocate buffer for bucket_arr
-    fprintf(stderr, "%s - %s:%d - Failed to allocate bucket_arr\n",
-            __PRETTY_FUNCTION__, __FILE__, __LINE__);
+    if (err) {
+      *err = CERR_STR("Failed to allocate bucket_arr");
+    }
     mem_free(chmap);
     return NULL;
+  }
+
+  if (err) {
+    *err = NULL;
   }
 
   return chmap;
@@ -427,8 +486,6 @@ uint32_t chmap_get_elem_count_to_scale_down(chashmap* chmap) {
 }
 #endif
 
-// This function is called while holding the chmap mutex, so no further
-// locking is needed.
 void scale_chmap(chashmap* chmap, bool up) {
   uint32_t new_bucket_array_size = 0;
   if (up) {
@@ -463,18 +520,18 @@ void scale_chmap(chashmap* chmap, bool up) {
   set_chmap_scaling_limits(chmap);
 }
 
-int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
-                      const chmap_pair* val_pair) {
+chashmap_retval_t chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
+                                    const chmap_pair* val_pair) {
   if (!chmap || !key_pair || !val_pair || !key_pair->ptr || !val_pair->ptr ||
       key_pair->size == 0 || val_pair->size == 0) {
-    return -1;
+    return chm_invalid_arguments;
   }
 
   chmap_entry data = {.hash_val = 0,
                       .key_pair = (chmap_pair*)key_pair,
                       .val_pair = (chmap_pair*)val_pair};
 
-  bool success = false;
+  bool result = false;
 
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, &data.hash_val);
@@ -482,11 +539,11 @@ int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
   llist_node* r = find_in_llist(chmap->bucket_arr[index], key_pair);
   if (r) {
     // The entry already exists
-    success = reset_val_of_llist_node(r, val_pair);
+    result = reset_val_of_llist_node(r, val_pair);
   } else {
     chmap->bucket_arr[index] = insert_into_llist(
-        chmap->bucket_arr[index], &chmap->head_of_all_elems, &data, &success);
-    if (success) {
+        chmap->bucket_arr[index], &chmap->head_of_all_elems, &data, &result);
+    if (result) {
       if (++chmap->elem_count >= chmap->elem_count_to_scale_up) {
         // Time to scale up!
         scale_chmap(chmap, true);
@@ -494,17 +551,19 @@ int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
     }
   }
 
-  return success ? 0 : -1;
+  return result ? chm_success : chm_not_enough_memory;
 }
 
-int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
-                        void* target_buf, uint32_t target_buf_size) {
+chashmap_retval_t chmap_get_elem_copy(chashmap* chmap,
+                                      const chmap_pair* key_pair,
+                                      void* target_buf,
+                                      uint32_t target_buf_size) {
   if (!chmap || !key_pair || !key_pair->ptr || key_pair->size == 0 ||
       !target_buf || target_buf_size == 0) {
-    return -1;
+    return chm_invalid_arguments;
   }
 
-  int success = -1;
+  chashmap_retval_t result = chm_key_not_found;
 
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, NULL);
@@ -516,20 +575,21 @@ int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
       min_size = r->data.val_pair->size;
     }
     mem_assign(target_buf, r->data.val_pair->ptr, min_size);
-    success = 0;
+    result = chm_success;
   }
 
-  return success;
+  return result;
 }
 
-int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
-                       chmap_pair** val_pair) {
+chashmap_retval_t chmap_get_elem_ref(chashmap* chmap,
+                                     const chmap_pair* key_pair,
+                                     chmap_pair** val_pair) {
   if (!chmap || !key_pair || !key_pair->ptr || key_pair->size == 0 ||
       !val_pair) {
-    return -1;
+    return chm_invalid_arguments;
   }
 
-  int success = -1;
+  chashmap_retval_t result = chm_key_not_found;
 
   uint32_t index =
       calculate_bucket_index(chmap->bucket_arr_size, key_pair, NULL);
@@ -537,10 +597,10 @@ int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
   llist_node* r = find_in_llist(chmap->bucket_arr[index], key_pair);
   if (r) {
     *val_pair = r->data.val_pair;
-    success = 0;
+    result = chm_success;
   }
 
-  return success;
+  return result;
 }
 
 void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair) {
@@ -589,18 +649,19 @@ void chmap_for_each_elem(chashmap* chmap,
   }
 }
 
-int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
+chashmap_retval_t chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
   if (!chmap) {
-    return -1;
+    return chm_invalid_arguments;
   }
 
-  int success = 0;
+  int result = chm_success;
 
   if (new_bucket_array_size > 0 &&
       new_bucket_array_size < minimum_allowed_bucket_array_size) {
     new_bucket_array_size = minimum_allowed_bucket_array_size;
   } else {
-    new_bucket_array_size = powl(2, ceill(log2l(new_bucket_array_size)));
+    new_bucket_array_size =
+        find_nearest_gte_power_of_two(new_bucket_array_size);
   }
 
   for (uint32_t i = 0; i < chmap->bucket_arr_size; ++i) {
@@ -614,7 +675,7 @@ int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
         chmap->bucket_arr, new_bucket_array_size * sizeof(llist_node*));
     if (!chmap->bucket_arr) {
       chmap->bucket_arr = orig;
-      success = -1;
+      result = chm_not_enough_memory;
     } else {
       chmap->bucket_arr_size = new_bucket_array_size;
     }
@@ -623,7 +684,7 @@ int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size) {
   memset(chmap->bucket_arr, 0, chmap->bucket_arr_size * sizeof(llist_node*));
   chmap->elem_count = 0;
 
-  return success;
+  return result;
 }
 
 void _chmap_destroy(chashmap* chmap) {

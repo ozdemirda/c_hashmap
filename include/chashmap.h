@@ -41,11 +41,22 @@ typedef struct chmap_pair {
   uint32_t size;
 } chmap_pair;
 
+typedef enum chashmap_retval_t {
+  // The provided arguments are not valid
+  chm_invalid_arguments = -3,
+  // The provided key was not found
+  chm_key_not_found,
+  // We failed to create a message
+  chm_not_enough_memory,
+  // All is good, the operation was a success
+  chm_success
+} chashmap_retval_t;
+
 // The function 'chmap_create' creates a new hash map instance and returns
 // the pointer to it. This pointer should be passed to the macro
 // 'chmap_destroy', once the hash map is no longer needed. The input parameter
 // 'bucket_array_size' determines the initial bucket size of the hash map.
-chashmap* chmap_create(uint32_t initial_bucket_array_size);
+chashmap* chmap_create(uint32_t initial_bucket_array_size, char** err);
 
 // The function 'chmap_elem_count' can be used to get the number of elements
 // in it. If chmap is NULL, this function will return 0;
@@ -58,25 +69,28 @@ uint32_t chmap_elem_count(chashmap* chmap);
 // this function will return -1. If the chmap pointer is not NULL, it will
 // always destroy the existing elements regardless of its return value,
 // the return value conveys information regarding the realloc attempt.
-int chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size);
+chashmap_retval_t chmap_reset(chashmap* chmap, uint32_t new_bucket_array_size);
 
 // The function chmap_insert_elem 'upserts' the val_pair associated with
 // the key_pair into the hash map chmap. If no element exists in the map
 // associated with the provided key_pair, this function will return -1,
 // otherwise it will return 0.
-int chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
-                      const chmap_pair* val_pair);
+chashmap_retval_t chmap_insert_elem(chashmap* chmap, const chmap_pair* key_pair,
+                                    const chmap_pair* val_pair);
 
 // The function chmap_get_elem_copy populates a copy of the data stored in the
 // val_pair from the hash map into the target_buf. The pointer target_buf SHOULD
 // BE non-null, otherwise the function will fail.
-int chmap_get_elem_copy(chashmap* chmap, const chmap_pair* key_pair,
-                        void* target_buf, uint32_t target_buf_size);
+chashmap_retval_t chmap_get_elem_copy(chashmap* chmap,
+                                      const chmap_pair* key_pair,
+                                      void* target_buf,
+                                      uint32_t target_buf_size);
 
 // This function gets a pointer to the element's value pair and stores it into
 // the pointer-to-pointer val_pair. Here, naturally, val_pair gets overwritten.
-int chmap_get_elem_ref(chashmap* chmap, const chmap_pair* key_pair,
-                       chmap_pair** val_pair);
+chashmap_retval_t chmap_get_elem_ref(chashmap* chmap,
+                                     const chmap_pair* key_pair,
+                                     chmap_pair** val_pair);
 
 // The function 'chmap_delete_elem' can be used to delete an element from the
 // hash map.
