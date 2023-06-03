@@ -312,13 +312,15 @@ void set_chmap_scaling_limits(chashmap* chmap) {
   chmap->elem_count_to_scale_down = chmap->bucket_arr_size / 8;
 }
 
-#define POWERS_OF_TWO_LEN 31
-uint32_t uint32_powers_of_two[POWERS_OF_TWO_LEN] = {
-    2,         4,          8,         16,       32,       64,        128,
-    256,       512,        1024,      2048,     4096,     8192,      16384,
-    32768,     65536,      131072,    262144,   524288,   1048576,   2097152,
-    4194304,   8388608,    16777216,  33554432, 67108864, 134217728, 268435456,
-    536870912, 1073741824, 2147483648};  // 4294967296 exceeds 32 bits
+#define POWERS_OF_TWO_LEN 32
+uint32_t uint32_powers_of_two[POWERS_OF_TWO_LEN] =
+    {
+        1,          2,         4,        8,         16,        32,
+        64,         128,       256,      512,       1024,      2048,
+        4096,       8192,      16384,    32768,     65536,     131072,
+        262144,     524288,    1048576,  2097152,   4194304,   8388608,
+        16777216,   33554432,  67108864, 134217728, 268435456, 536870912,
+        1073741824, 2147483648};  // 4294967296 exceeds 32 bits
 
 // Kind of a "pow(2, ceil(log2(input)))" without the math library.
 uint32_t find_nearest_gte_power_of_two(uint32_t input) {
