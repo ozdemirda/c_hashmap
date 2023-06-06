@@ -36,7 +36,7 @@ SOFTWARE.
 #define x_stringify(s) stringify(s)
 #define CERR_STR(x) (__FILE__ ":" x_stringify(__LINE__) " - " x)
 
-const uint32_t minimum_allowed_bucket_array_size = 2048;
+const uint32_t minimum_allowed_bucket_array_size = 64;
 const uint32_t scale_factor = 4;
 const uint32_t minimum_scale_down_threshold =
     scale_factor * minimum_allowed_bucket_array_size;
