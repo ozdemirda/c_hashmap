@@ -32,9 +32,17 @@ SOFTWARE.
 #define _GNU_SOURCE
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct chashmap chashmap;
+
+typedef struct chashmap_memmgmt_procs_t {
+  void* (*malloc)(size_t size);
+  void (*free)(void* ptr);
+  void* (*calloc)(size_t elem_count, size_t elem_size);
+  void* (*realloc)(void* ptr, size_t size);
+} chashmap_memmgmt_procs_t;
 
 typedef struct chmap_pair {
   void* ptr;
@@ -56,7 +64,11 @@ typedef enum chashmap_retval_t {
 // the pointer to it. This pointer should be passed to the macro
 // 'chmap_destroy', once the hash map is no longer needed. The input parameter
 // 'bucket_array_size' determines the initial bucket size of the hash map.
-chashmap* chmap_create(uint32_t initial_bucket_array_size, char** err);
+chashmap* chmap_create_mp(uint32_t initial_bucket_array_size,
+                          chashmap_memmgmt_procs_t* mmgmt_procs, char** err);
+
+#define chmap_create(initial_bucket_array_size, err) \
+  chmap_create_mp(initial_bucket_array_size, NULL, err)
 
 // The function 'chmap_elem_count' can be used to get the number of elements
 // in it. If chmap is NULL, this function will return 0;
@@ -94,7 +106,8 @@ chashmap_retval_t chmap_get_elem_ref(chashmap* chmap,
 
 // The function 'chmap_delete_elem' can be used to delete an element from the
 // hash map.
-void chmap_delete_elem(chashmap* chmap, const chmap_pair* key_pair);
+chashmap_retval_t chmap_delete_elem(chashmap* chmap,
+                                    const chmap_pair* key_pair);
 
 // The function 'chmap_for_each_elem' is meant to provide a mechanism similar
 // to iteration. It will execute the callback on the every element present in
@@ -107,12 +120,12 @@ void chmap_for_each_elem(chashmap* chmap,
 
 // The function '_chmap_destroy' is not meant to be used directly, please use
 // the macro 'chmap_destroy' instead.
-void _chmap_destroy(chashmap* chmap);
+void __chmap_destroy(chashmap* chmap);
 
 // The macro 'chmap_destroy' can be used to destroy a hash map. The pointer
 // then gets set to NULL.
 #define chmap_destroy(chmap) \
   do {                       \
-    _chmap_destroy(chmap);   \
+    __chmap_destroy(chmap);  \
     chmap = NULL;            \
   } while (0)

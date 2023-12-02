@@ -1,7 +1,6 @@
 #include <chashmap.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <tau/tau.h>
 TAU_MAIN()  // sets up Tau (+ main function)
 
@@ -63,6 +62,38 @@ TEST(chash_maps, create_fails) {
   chashmap* chmap = chmap_create(0, &err);
   REQUIRE_EQ((void*)chmap, NULL);
   REQUIRE_NE((void*)err, NULL);
+
+  chmap = chmap_create_mp(
+      4096,
+      &(chashmap_memmgmt_procs_t){
+          .malloc = NULL, .free = free, .calloc = calloc, .realloc = realloc},
+      &err);
+  REQUIRE_EQ((void*)chmap, NULL);
+  REQUIRE_NE((void*)err, NULL);
+
+  chmap = chmap_create_mp(
+      4096,
+      &(chashmap_memmgmt_procs_t){
+          .malloc = malloc, .free = NULL, .calloc = calloc, .realloc = realloc},
+      &err);
+  REQUIRE_EQ((void*)chmap, NULL);
+  REQUIRE_NE((void*)err, NULL);
+
+  chmap = chmap_create_mp(
+      4096,
+      &(chashmap_memmgmt_procs_t){
+          .malloc = malloc, .free = free, .calloc = NULL, .realloc = realloc},
+      &err);
+  REQUIRE_EQ((void*)chmap, NULL);
+  REQUIRE_NE((void*)err, NULL);
+
+  chmap = chmap_create_mp(
+      4096,
+      &(chashmap_memmgmt_procs_t){
+          .malloc = malloc, .free = free, .calloc = calloc, .realloc = NULL},
+      &err);
+  REQUIRE_EQ((void*)chmap, NULL);
+  REQUIRE_NE((void*)err, NULL);
 }
 
 TEST(chash_maps, create_succeeds) {
@@ -70,6 +101,15 @@ TEST(chash_maps, create_succeeds) {
   chashmap* chmap = chmap_create(4096, &err);
   REQUIRE_NE((void*)chmap, NULL);
   REQUIRE_EQ((void*)err, NULL);
+
+  chmap_destroy(chmap);
+  REQUIRE_EQ((void*)chmap, NULL);
+
+  chmap = chmap_create_mp(
+      4096,
+      &(chashmap_memmgmt_procs_t){
+          .malloc = malloc, .free = free, .calloc = calloc, .realloc = realloc},
+      &err);
 
   chmap_destroy(chmap);
   REQUIRE_EQ((void*)chmap, NULL);
@@ -99,14 +139,47 @@ int get_int_ref_from_string(chashmap* chmap, const char* key, int** val_ptr) {
   return -1;
 }
 
-void delete_int_from_string(chashmap* chmap, const char* key) {
-  chmap_delete_elem(chmap,
-                    &(chmap_pair){.ptr = (void*)key, .size = strlen(key)});
+chashmap_retval_t delete_int_from_string(chashmap* chmap, const char* key) {
+  return chmap_delete_elem(
+      chmap, &(chmap_pair){.ptr = (void*)key, .size = strlen(key)});
 }
 // Helper functions end.
 
 TEST(chash_maps, basic_insertions_and_lookups) {
   chashmap* chmap = chmap_create(1, NULL);
+  REQUIRE_NE((void*)chmap, NULL);
+
+  int val = -1;
+
+  REQUIRE_EQ(get_int_from_string(chmap, "key1", &val), chm_key_not_found);
+  REQUIRE_EQ(get_int_from_string(chmap, "", &val), chm_invalid_arguments);
+
+  REQUIRE_EQ(chmap_elem_count(chmap), 0);
+
+  REQUIRE_EQ(insert_string_to_int(chmap, "key1", 2), chm_success);
+  REQUIRE_EQ(chmap_elem_count(chmap), 1);
+  REQUIRE_EQ(insert_string_to_int(chmap, "key1", 3), chm_success);
+  REQUIRE_EQ(chmap_elem_count(chmap), 1);
+
+  REQUIRE_EQ(insert_string_to_int(chmap, "key2", 4), chm_success);
+  REQUIRE_EQ(chmap_elem_count(chmap), 2);
+  REQUIRE_EQ(insert_string_to_int(chmap, "key2", 5), chm_success);
+  REQUIRE_EQ(chmap_elem_count(chmap), 2);
+
+  REQUIRE_EQ(get_int_from_string(chmap, "key1", &val), chm_success);
+  REQUIRE_EQ(val, 3);
+  REQUIRE_EQ(get_int_from_string(chmap, "key2", &val), chm_success);
+  REQUIRE_EQ(val, 5);
+
+  chmap_destroy(chmap);
+}
+
+TEST(chash_maps, basic_insertions_and_lookups_with_memmgmt_procs) {
+  chashmap* chmap = chmap_create_mp(
+      1,
+      &(chashmap_memmgmt_procs_t){
+          .malloc = malloc, .free = free, .calloc = calloc, .realloc = realloc},
+      NULL);
   REQUIRE_NE((void*)chmap, NULL);
 
   int val = -1;
@@ -369,8 +442,10 @@ TEST(chash_maps, basic_deletions) {
 
   REQUIRE_EQ(chmap_elem_count(chmap), 0);
 
-  delete_int_from_string(chmap, "key1");  // Should not have any side effects
-  delete_int_from_string(chmap, "");      // Should not have any side effects
+  REQUIRE_EQ(delete_int_from_string(chmap, "key1"),
+             chm_key_not_found);  // Should not have any side effects
+  REQUIRE_EQ(delete_int_from_string(chmap, ""),
+             chm_invalid_arguments);  // Should not have any side effects
 
   REQUIRE_EQ(insert_string_to_int(chmap, "key1", 3), chm_success);
   REQUIRE_EQ(insert_string_to_int(chmap, "key2", 5), chm_success);
@@ -382,18 +457,20 @@ TEST(chash_maps, basic_deletions) {
   REQUIRE_EQ(get_int_from_string(chmap, "key2", &val), chm_success);
   REQUIRE_EQ(val, 5);
 
-  delete_int_from_string(chmap, "key1");
+  REQUIRE_EQ(delete_int_from_string(chmap, "key1"), chm_success);
   REQUIRE_EQ(get_int_from_string(chmap, "key1", &val), chm_key_not_found);
 
   REQUIRE_EQ(chmap_elem_count(chmap), 1);
 
-  delete_int_from_string(chmap, "key2");
+  REQUIRE_EQ(delete_int_from_string(chmap, "key2"), chm_success);
   REQUIRE_EQ(get_int_from_string(chmap, "key2", &val), chm_key_not_found);
 
   REQUIRE_EQ(chmap_elem_count(chmap), 0);
 
-  delete_int_from_string(chmap, "key1");  // Should not have any side effects
-  delete_int_from_string(chmap, "");      // Should not have any side effects
+  REQUIRE_EQ(delete_int_from_string(chmap, "key1"),
+             chm_key_not_found);  // Should not have any side effects
+  REQUIRE_EQ(delete_int_from_string(chmap, ""),
+             chm_invalid_arguments);  // Should not have any side effects
 
   chmap_destroy(chmap);
 }
