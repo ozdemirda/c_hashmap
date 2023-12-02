@@ -94,7 +94,7 @@ int main() {
 ```
 
 So, the recommendation is implementing your own wrappers based on your own use
-case. Although I was tempted to implementing some wrappers at least for the
+case. Although I was tempted to implement some wrappers, at least for the
 integral data types, I decided not to do it, as they would consume an additional
 area in the program store, and for some use cases those would be a waste of
 memory.
